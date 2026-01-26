@@ -1,0 +1,46 @@
+# Netlify Configuration for Saini Mewa Stores Web App
+
+[build]
+  # Build command - Vite will build the React app
+  command = "npm run build"
+  
+  # Directory where the built files will be located
+  publish = "dist"
+# API Proxy - Forward /api requests to backend server
+[[redirects]]
+  from = "/api/*"
+  to = "https://api.sainidryfruits.com/api/:splat"
+  status = 200
+  force = true
+# Redirect rules - Important for React Router (SPA)
+
+# All routes should redirect to index.html so React Router can handle routing
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Headers for security and CORS
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+# Headers for static assets (cache for better performance)
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Headers for index.html (no cache to ensure updates)
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# Environment variables can be set in Netlify dashboard:
+# Site settings > Environment variables
+# Add: VITE_BACKEND_URL = https://api.sainidryfruits.com
