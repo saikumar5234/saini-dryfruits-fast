@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { API_ENDPOINTS, TRANSLATION_CONFIG } from './config.js';
+import { formatDisplayDate as formatDisplayDateUtil } from './utils/dateFormat';
 import {
   AppBar,
   Toolbar,
@@ -266,7 +267,7 @@ function Header({ user, onLogout, onHomeClick, onUpdatePriceClick, onAddGreeting
     if (diffInMinutes < 1) return 'Just now';
     if (diffInMinutes < 60) return `${diffInMinutes} minutes ago`;
     if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)} hours ago`;
-    return date.toLocaleDateString();
+    return formatDisplayDateUtil(date);
   };
 
   const userName = user?.name || user?.email || 'User';

@@ -23,6 +23,7 @@ import { FullscreenImageDialog, TranslationSuccessSnackbar } from './components/
 
 // Import utilities and hooks
 import { createTableColumns } from './utils/tableColumns';
+import { formatChartDate } from './utils/dateFormat';
 import { 
   useProducts, 
   useCategories, 
@@ -95,7 +96,6 @@ function TableViewContent() {
   // Image states
   const [pendingNewProductImages, setPendingNewProductImages] = useState([]);
   const [viewImageIds, setViewImageIds] = useState([]);
-  const [viewImagesLoading, setViewImagesLoading] = useState(false);
   const [pendingImageFiles, setPendingImageFiles] = useState([]);
   const [deletingImageIdx, setDeletingImageIdx] = useState(null);
   const [addImageFile, setAddImageFile] = useState(null);
@@ -275,20 +275,33 @@ function TableViewContent() {
       return;
     }
     setDeleteDialogOpen(false);
-    
-    // Optimistically remove from UI immediately for instant feedback
-    setData(prev => prev.filter(p => p.id !== row.id));
-    setEditedData(prev => prev.filter(p => p.id !== row.id));
-    
-    // Then delete from backend (non-blocking)
+    const productId = String(row.id);
+    const imageIds = Array.isArray(row.imageUrls) ? row.imageUrls.filter(id => id != null && !isNaN(Number(id))) : [];
+
     try {
-      const response = await fetch(`${API_ENDPOINTS.PRODUCTS}/${row.id}`, {
+      // Delete all product images first (avoids DB foreign key constraint on product_image.product_id)
+      for (const imageId of imageIds) {
+        try {
+          await fetch(API_ENDPOINTS.PRODUCT_IMAGE_DELETE(imageId), { method: 'DELETE' });
+        } catch (e) {
+          // Continue with other images and product delete
+        }
+      }
+      const response = await fetch(`${API_ENDPOINTS.PRODUCTS}/${productId}`, {
         method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
       });
       if (!response.ok) {
-        // If delete fails, we could optionally refetch to restore the item
+        const errText = await response.text();
+        console.error('Delete product failed:', response.status, errText);
+        alert(`Could not delete product: ${response.status} ${response.statusText}. Please try again.`);
+        return;
       }
+      setData(prev => prev.filter(p => String(p.id) !== productId));
+      setEditedData(prev => prev.filter(p => String(p.id) !== productId));
     } catch (error) {
+      console.error('Error deleting product:', error);
+      alert(`Error: ${error.message}. Please try again.`);
     }
   }, []);
 
@@ -301,25 +314,43 @@ function TableViewContent() {
 
   const confirmDeleteSelectedProducts = useCallback(async () => {
     const selectedIds = Object.keys(rowSelection).filter(key => rowSelection[key]);
+    if (selectedIds.length === 0) return;
     setConfirmDeleteSelectedOpen(false);
-    setRowSelection({}); // Clear selection immediately
-    
-    // Optimistically remove from UI immediately for instant feedback
-    setData(prev => prev.filter(p => !selectedIds.includes(String(p.id))));
-    setEditedData(prev => prev.filter(p => !selectedIds.includes(String(p.id))));
-    
-    // Then delete from backend (non-blocking)
-    try {
-      await Promise.all(selectedIds.map(async (productId) => {
+    setRowSelection({});
+
+    const failed = [];
+    const ok = [];
+    for (const id of selectedIds) {
+      const productId = String(id);
+      const product = data.find(p => String(p.id) === productId);
+      const imageIds = Array.isArray(product?.imageUrls) ? product.imageUrls.filter(i => i != null && !isNaN(Number(i))) : [];
+      try {
+        for (const imageId of imageIds) {
+          try {
+            await fetch(API_ENDPOINTS.PRODUCT_IMAGE_DELETE(imageId), { method: 'DELETE' });
+          } catch (e) {}
+        }
         const response = await fetch(`${API_ENDPOINTS.PRODUCTS}/${productId}`, {
           method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
         });
-        if (!response.ok) throw new Error(`Failed to delete product ${productId}`);
-      }));
-    } catch (error) {
-      // Could optionally refetch here to restore items if delete failed
+        if (response.ok) {
+          ok.push(productId);
+        } else {
+          failed.push(productId);
+        }
+      } catch (e) {
+        failed.push(productId);
+      }
     }
-  }, [rowSelection]);
+    if (failed.length > 0) {
+      alert(`Failed to delete ${failed.length} product(s). Succeeded: ${ok.length}. Please try again.`);
+    }
+    if (ok.length > 0) {
+      setData(prev => prev.filter(p => !ok.includes(String(p.id))));
+      setEditedData(prev => prev.filter(p => !ok.includes(String(p.id))));
+    }
+  }, [rowSelection, data]);
 
   // Handle disable for selected products
   const handleDisableSelectedProducts = useCallback(async () => {
@@ -799,7 +830,7 @@ function TableViewContent() {
     setEditedData(data);
   }, [exitEditMode, data, setEditedData]);
 
-  const handleOpenImageDialog = useCallback(async (productId, edit = false) => {
+  const handleOpenImageDialog = useCallback((productId, edit = false) => {
     const id = productId != null ? String(productId) : null;
     setImageDialogProductId(id);
     setImageDialogEditMode(edit);
@@ -811,22 +842,12 @@ function TableViewContent() {
       setUploadSuccess(false);
       setImageEditSaveSuccess(false);
     }
-    // Only fetch images for view mode
-    if (!edit && id && !isNaN(Number(id))) {
-      setViewImagesLoading(true);
-      setViewImageIds([]);
-      try {
-        const res = await fetch(API_ENDPOINTS.PRODUCT_IMAGES(id));
-        if (res.ok) {
-          const ids = await res.json();
-          setViewImageIds(ids);
-        }
-      } catch (e) {
-        setViewImageIds([]);
-      }
-      setViewImagesLoading(false);
+    // Use cached imageIds from list for view mode (no fetch, no loading)
+    if (!edit && id) {
+      const product = editedData.find(p => String(p.id) === id) || data.find(p => String(p.id) === id);
+      setViewImageIds(Array.isArray(product?.imageUrls) ? product.imageUrls : []);
     }
-  }, []);
+  }, [data, editedData]);
 
   const handleCloseImageDialog = useCallback(() => {
     setImageDialogOpen(false);
@@ -1214,7 +1235,7 @@ function TableViewContent() {
         lastPrice = priceMap[date];
       }
       return {
-        date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        date: formatChartDate(date),
         price: lastPrice
       };
     });
@@ -1288,10 +1309,8 @@ function TableViewContent() {
   if (loading) {
     return (
       <Box sx={{ p: 4 }}>
-        <Skeleton variant="rectangular" width="100%" height={50} sx={{ mb: 2 }} />
-        <Skeleton variant="rectangular" width="100%" height={50} sx={{ mb: 2 }} />
-        <Skeleton variant="rectangular" width="100%" height={50} sx={{ mb: 2 }} />
-        <Skeleton variant="rectangular" width="100%" height={50} />
+        <Skeleton variant="rectangular" width="100%" height={48} sx={{ mb: 1.5 }} />
+        <Skeleton variant="rectangular" width="100%" height={48} />
       </Box>
     );
   }
@@ -1354,7 +1373,7 @@ function TableViewContent() {
       
       {/* Edit Product Dialog - Only render when open for instant performance */}
       {editProductDialogOpen && (
-        <Suspense fallback={<CircularProgress />}>
+        <Suspense fallback={null}>
           <EditProductDialog
             open={editProductDialogOpen}
             onClose={handleCloseEditProductDialog}
@@ -1372,14 +1391,13 @@ function TableViewContent() {
       
       {/* Image Dialog - Only render when open for instant performance */}
       {imageDialogOpen && (
-        <Suspense fallback={<CircularProgress />}>
+        <Suspense fallback={null}>
           <ProductImageDialog
             open={imageDialogOpen}
             onClose={handleCloseImageDialog}
             editMode={imageDialogEditMode}
             imageUrls={imageDialogProductId != null ? (editedData.find(p => String(p.id) === imageDialogProductId)?.imageUrls ?? []) : []}
             viewImageIds={viewImageIds}
-            viewImagesLoading={viewImagesLoading}
             pendingImageFiles={pendingImageFiles}
             uploading={uploading}
             uploadSuccess={uploadSuccess}

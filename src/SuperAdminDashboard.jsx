@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { formatDisplayDate } from './utils/dateFormat';
 import {
   Box,
   Typography,
@@ -264,7 +265,7 @@ const SuperAdminDashboard = () => {
                       />
                     </TableCell>
                     <TableCell>
-                      {new Date(admin.createdAt).toLocaleDateString()}
+                      {formatDisplayDate(admin.createdAt)}
                     </TableCell>
                     <TableCell align="center">
                       <Tooltip title="Delete">

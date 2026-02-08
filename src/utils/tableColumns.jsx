@@ -9,6 +9,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 import { useEditContext } from '../contexts/EditContext';
+import { formatChartDate } from './dateFormat';
 
 // Price input with local state for instant updates
 const PriceInput = ({ initialValue, productId, rowIndex, priceRefs, priceFieldTouched, handlePriceChange, disabled }) => {
@@ -314,7 +315,7 @@ export const createTableColumns = ({
         }
         data = data.slice(-10).map(d => ({
           ...d,
-          date: new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+          date: formatChartDate(d.date)
         }));
         let color = '#2E7D32';
         if (data.length > 1) {

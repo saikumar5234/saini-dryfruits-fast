@@ -6,11 +6,15 @@ export const useProducts = () => {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState([]);
   const [editedData, setEditedData] = useState([]);
+  const initialLoadDone = useRef(false);
 
   const isNumericId = id => !isNaN(Number(id));
 
   const fetchProducts = async () => {
-    setLoading(true);
+    // Only show full-page loading on initial load; avoid flicker on refresh
+    if (!initialLoadDone.current) {
+      setLoading(true);
+    }
     try {
       const response = await fetch(API_ENDPOINTS.PRODUCTS);
       if (!response.ok) throw new Error('Failed to fetch products');
@@ -62,11 +66,13 @@ export const useProducts = () => {
         });
       setData(adapted);
       setEditedData(adapted);
+      initialLoadDone.current = true;
       setLoading(false);
       return adapted;
     } catch (error) {
       setData([]);
       setEditedData([]);
+      initialLoadDone.current = true;
       setLoading(false);
       return [];
     }
@@ -79,9 +85,10 @@ export const useProducts = () => {
 export const useCategories = () => {
   const [categories, setCategories] = useState([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
+  const categoriesLoadDone = useRef(false);
 
   const fetchCategories = async () => {
-    setCategoriesLoading(true);
+    if (!categoriesLoadDone.current) setCategoriesLoading(true);
     try {
       const response = await fetch(API_ENDPOINTS.CATEGORIES);
       if (response.ok) {
@@ -94,6 +101,7 @@ export const useCategories = () => {
     } catch (error) {
       setCategories([]);
     } finally {
+      categoriesLoadDone.current = true;
       setCategoriesLoading(false);
     }
   };
@@ -101,29 +109,41 @@ export const useCategories = () => {
   return { categories, categoriesLoading, fetchCategories };
 };
 
-// Hook for price histories
+// Hook for price histories - deferred so table paints first
 export const usePriceHistories = (data, editedData, editMode) => {
   const [priceHistories, setPriceHistories] = useState({});
 
   useEffect(() => {
-    const fetchAllPriceHistories = async () => {
-      const ids = (editMode ? editedData : data).map(p => p.id).filter(id => !isNaN(Number(id)));
-      const histories = {};
-      await Promise.all(ids.map(async (id) => {
-        try {
-          const res = await fetch(API_ENDPOINTS.PRODUCT_PRICE_HISTORY(id));
-          if (res.ok) {
-            const hist = await res.json();
-            histories[id] = hist.map(h => ({
-              date: h.changedAt ? h.changedAt.split('T')[0] : '',
-              price: h.price
-            })).slice(-10);
-          }
-        } catch {}
-      }));
-      setPriceHistories(histories);
+    const ids = (editMode ? editedData : data).map(p => p.id).filter(id => !isNaN(Number(id)));
+    if (ids.length === 0) {
+      setPriceHistories({});
+      return;
+    }
+    let cancelled = false;
+    const timeoutId = setTimeout(() => {
+      const fetchAllPriceHistories = async () => {
+        const histories = {};
+        await Promise.all(ids.map(async (id) => {
+          if (cancelled) return;
+          try {
+            const res = await fetch(API_ENDPOINTS.PRODUCT_PRICE_HISTORY(id));
+            if (res.ok) {
+              const hist = await res.json();
+              histories[id] = hist.map(h => ({
+                date: h.changedAt ? h.changedAt.split('T')[0] : '',
+                price: h.price
+              })).slice(-10);
+            }
+          } catch {}
+        }));
+        if (!cancelled) setPriceHistories(histories);
+      };
+      fetchAllPriceHistories();
+    }, 0);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
     };
-    fetchAllPriceHistories();
   }, [data, editedData, editMode]);
 
   return priceHistories;

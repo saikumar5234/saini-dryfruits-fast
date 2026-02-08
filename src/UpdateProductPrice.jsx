@@ -164,7 +164,8 @@ const UpdateProductPrice = ({ open, onClose }) => {
                 label="Date"
                 value={date}
                 onChange={setDate}
-                renderInput={(params) => <TextField {...params} fullWidth margin="normal" required />}
+                format="dd/MM/yyyy"
+                slotProps={{ textField: { fullWidth: true, margin: 'normal', required: true } }}
               />
             </LocalizationProvider>
             <Grow in={!!error}><div>{error && <Box color="error.main" mt={2}><Fade in={!!error}><div>{error}</div></Fade></Box>}</div></Grow>

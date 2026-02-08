@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { formatDisplayDateTime } from './utils/dateFormat';
 import {
   Box,
   Card,
@@ -84,8 +85,10 @@ const Profile = ({ user }) => {
 
   if (loading) {
     return (
-      <Container maxWidth="lg" sx={{ py: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
-        <CircularProgress />
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+          <CircularProgress size={32} />
+        </Box>
       </Container>
     );
   }
@@ -124,18 +127,10 @@ const Profile = ({ user }) => {
     return 'U';
   };
 
-  // Format date
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
+      return formatDisplayDateTime(dateString);
     } catch (e) {
       return dateString;
     }

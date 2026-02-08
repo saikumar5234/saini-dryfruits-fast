@@ -18,7 +18,6 @@ const ProductImageDialog = React.memo(({
   editMode,
   imageUrls,
   viewImageIds,
-  viewImagesLoading,
   pendingImageFiles,
   uploading,
   uploadSuccess,
@@ -130,12 +129,6 @@ const ProductImageDialog = React.memo(({
                 </Grid>
               )
             ))
-          ) : viewImagesLoading ? (
-            <Grid item xs={12}>
-              <Box sx={{ color: 'text.disabled', textAlign: 'center', py: 2 }}>
-                Loading images...
-              </Box>
-            </Grid>
           ) : viewImageIds.length > 0 ? (
             viewImageIds.map((imageId, idx) => (
               <Grid item xs={6} sm={4} md={3} key={idx}>

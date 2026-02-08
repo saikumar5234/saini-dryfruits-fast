@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { API_ENDPOINTS } from './config.js';
+import { formatDisplayDate, formatChartDate } from './utils/dateFormat';
 import {
   Box,
   Card,
@@ -277,7 +278,7 @@ const PriceAnalytics = () => {
         const days = timeRange === 'all' ? 30 : parseInt(timeRange);
         const dateRange = getDateRange(days);
         return dateRange.map(date => ({
-          date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          date: formatChartDate(date),
           price: selectedProduct.price
         }));
       }
@@ -293,19 +294,11 @@ const PriceAnalytics = () => {
         lastPrice = priceMap[date];
       }
       return {
-        date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        date: formatChartDate(date),
         price: lastPrice
       };
     });
   };
-
-  if (loadingHistory && !selectedProduct) {
-    return (
-      <Box sx={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <CircularProgress size={64} thickness={4} color="primary" />
-      </Box>
-    );
-  }
 
   return (
     <Fade in timeout={600}>
@@ -638,7 +631,7 @@ const PriceAnalytics = () => {
                             const trend = change > 0 ? 'up' : change < 0 ? 'down' : 'neutral';
                             return (
                               <TableRow key={record.date} hover>
-                                <TableCell>{new Date(record.date).toLocaleDateString()}</TableCell>
+                                <TableCell>{formatDisplayDate(record.date)}</TableCell>
                                 <TableCell sx={{ fontWeight: 'bold' }}>₹{record.price}</TableCell>
                                 <TableCell sx={{
                                   color: getTrendColor(trend),

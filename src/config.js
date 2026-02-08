@@ -2,7 +2,7 @@
 // Use environment variable if available, otherwise use production URL
 export const BACKEND_BASE_URL = import.meta.env.VITE_BACKEND_URL ||'https://api.sainidryfruits.com';
 // export const BACKEND_BASE_URL = import.meta.env.VITE_BACKEND_URL || (import.meta.env.PROD ? '/api' : 'https://api.sainidryfruits.com');
-// export const BACKEND_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://10.102.219.124:8080';
+// export const BACKEND_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://10.224.104.124:8080';
 // Translation API configuration
 export const TRANSLATION_CONFIG = {
   // Google Translate API (requires API key)

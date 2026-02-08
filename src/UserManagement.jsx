@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Box, Typography, IconButton, Tooltip, TextField, Button, Alert, Snackbar } from '@mui/material';
 import { MaterialReactTable } from 'material-react-table';
 import { CheckCircle, Cancel, Download } from '@mui/icons-material';
@@ -6,6 +6,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { API_ENDPOINTS } from './config.js';
+import { formatDisplayDate } from './utils/dateFormat';
 import * as XLSX from 'xlsx';
 
 // helper: format seconds → hh:mm:ss
@@ -31,6 +32,7 @@ const UserManagement = () => {
   const [selectedRange, setSelectedRange] = useState('1d');
   const [data, setData] = useState([]);   
   const [loading, setLoading] = useState(true);
+  const initialLoadDone = useRef(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
@@ -54,7 +56,7 @@ const UserManagement = () => {
   // Fetch user data including pending approvals
   const fetchUserData = async (targetDate = selectedDate, range = selectedRange) => {
     try {
-      setLoading(true);
+      if (!initialLoadDone.current) setLoading(true);
       
       // fetch user details from /api/users to get firstName and lastName
       let usersData = [];
@@ -268,6 +270,7 @@ const UserManagement = () => {
     } catch (err) {
       console.error('Error fetching data:', err);
     } finally {
+      initialLoadDone.current = true;
       setLoading(false);
     }
   };
@@ -290,14 +293,12 @@ const UserManagement = () => {
   // Handle date change
   const handleDateChange = (newDate) => {
     setSelectedDate(newDate);
-    setLoading(true);
     fetchUserData(newDate, selectedRange);
   };
 
   // Handle range change
   const handleRangeChange = (newRange) => {
     setSelectedRange(newRange);
-    setLoading(true);
     fetchUserData(selectedDate, newRange);
   };
 
@@ -412,7 +413,7 @@ const UserManagement = () => {
     
     switch (selectedRange) {
       case '1d':
-        return isToday ? "Today's Time Spent" : `${selectedDate.toLocaleDateString()} Time Spent`;
+        return isToday ? "Today's Time Spent" : `${formatDisplayDate(selectedDate)} Time Spent`;
       case '1w':
         return "1 Week Time Spent";
       case '1m':
@@ -489,7 +490,7 @@ const UserManagement = () => {
       const wb = XLSX.utils.book_new();
       
       // Add metadata rows (title and date range)
-      const dateRangeText = `Date Range: ${selectedDate.toLocaleDateString()}${selectedRange !== '1d' ? ` - ${endDate.toLocaleDateString()}` : ''} (${selectedRange.toUpperCase()})`;
+      const dateRangeText = `Date Range: ${formatDisplayDate(selectedDate)}${selectedRange !== '1d' ? ` - ${formatDisplayDate(endDate)}` : ''} (${selectedRange.toUpperCase()})`;
       const metadata = [
         ['User Management Report'],
         [dateRangeText],
@@ -713,6 +714,7 @@ const UserManagement = () => {
             label="Select Date"
             value={selectedDate}
             onChange={handleDateChange}
+            format="dd/MM/yyyy"
             slotProps={{
               textField: { size: 'small', sx: { minWidth: 150 } }
             }}
@@ -744,7 +746,7 @@ const UserManagement = () => {
       <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
         <Box sx={{ p: 2, backgroundColor: 'background.paper', borderRadius: 1, border: '1px solid', borderColor: 'divider', flex: 1 }}>
           <Typography variant="body2" color="text.secondary">
-            <strong>Showing data for:</strong> {selectedDate.toLocaleDateString()} 
+            <strong>Showing data for:</strong> {formatDisplayDate(selectedDate)} 
             {selectedRange !== '1d' && (
               <span> to {(() => {
                 const endDate = new Date(selectedDate);
@@ -755,7 +757,7 @@ const UserManagement = () => {
                   case '6m': endDate.setMonth(endDate.getMonth() + 6); endDate.setDate(endDate.getDate() - 1); break;
                   default: break;
                 }
-                return endDate.toLocaleDateString();
+                return formatDisplayDate(endDate);
               })()}
             </span>
             )}
