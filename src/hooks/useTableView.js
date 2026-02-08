@@ -62,11 +62,14 @@ export const useProducts = () => {
         });
       setData(adapted);
       setEditedData(adapted);
+      setLoading(false);
+      return adapted;
     } catch (error) {
       setData([]);
       setEditedData([]);
+      setLoading(false);
+      return [];
     }
-    setLoading(false);
   };
 
   return { loading, data, setData, editedData, setEditedData, fetchProducts, isNumericId };

@@ -63,7 +63,7 @@ function TableViewContent() {
 
   const [rowToDelete, setRowToDelete] = useState(null);
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
-  const [imageDialogRowIndex, setImageDialogRowIndex] = useState(null);
+  const [imageDialogProductId, setImageDialogProductId] = useState(null);
   const [imageDialogEditMode, setImageDialogEditMode] = useState(false);
   const [editProductDialogOpen, setEditProductDialogOpen] = useState(false);
   const [fullscreenImage, setFullscreenImage] = useState(null);
@@ -799,8 +799,9 @@ function TableViewContent() {
     setEditedData(data);
   }, [exitEditMode, data, setEditedData]);
 
-  const handleOpenImageDialog = useCallback(async (rowIndex, edit = false) => {
-    setImageDialogRowIndex(rowIndex);
+  const handleOpenImageDialog = useCallback(async (productId, edit = false) => {
+    const id = productId != null ? String(productId) : null;
+    setImageDialogProductId(id);
     setImageDialogEditMode(edit);
     setImageDialogOpen(true);
     // Reset upload states when opening in edit mode
@@ -811,28 +812,25 @@ function TableViewContent() {
       setImageEditSaveSuccess(false);
     }
     // Only fetch images for view mode
-    if (!edit) {
+    if (!edit && id && !isNaN(Number(id))) {
       setViewImagesLoading(true);
       setViewImageIds([]);
-      const productId = data[rowIndex]?.id;
-      if (productId && !isNaN(Number(productId))) {
-        try {
-          const res = await fetch(API_ENDPOINTS.PRODUCT_IMAGES(productId));
-          if (res.ok) {
-            const ids = await res.json();
-            setViewImageIds(ids);
-          }
-        } catch (e) {
-          setViewImageIds([]);
+      try {
+        const res = await fetch(API_ENDPOINTS.PRODUCT_IMAGES(id));
+        if (res.ok) {
+          const ids = await res.json();
+          setViewImageIds(ids);
         }
+      } catch (e) {
+        setViewImageIds([]);
       }
       setViewImagesLoading(false);
     }
-  }, [data]);
+  }, []);
 
   const handleCloseImageDialog = useCallback(() => {
     setImageDialogOpen(false);
-    setImageDialogRowIndex(null);
+    setImageDialogProductId(null);
     setImageDialogEditMode(false);
     setPendingImageFiles([]);
     setUploadError("");
@@ -842,9 +840,9 @@ function TableViewContent() {
   }, []);
 
   const handleImageDialogUrlChange = (value, imgIdx) => {
-    if (imageDialogRowIndex === null) return;
-    setEditedData(prev => prev.map((row, idx) => {
-      if (idx === imageDialogRowIndex) {
+    if (imageDialogProductId == null) return;
+    setEditedData(prev => prev.map((row) => {
+      if (String(row.id) === imageDialogProductId) {
         const urls = Array.isArray(row.imageUrls) ? [...row.imageUrls] : [];
         urls[imgIdx] = value;
         return { ...row, imageUrls: urls };
@@ -854,9 +852,9 @@ function TableViewContent() {
   };
 
   const handleImageDialogAddImage = () => {
-    if (imageDialogRowIndex === null) return;
-    setEditedData(prev => prev.map((row, idx) => {
-      if (idx === imageDialogRowIndex) {
+    if (imageDialogProductId == null) return;
+    setEditedData(prev => prev.map((row) => {
+      if (String(row.id) === imageDialogProductId) {
         const urls = Array.isArray(row.imageUrls) ? [...row.imageUrls] : [];
         urls.push('');
         return { ...row, imageUrls: urls };
@@ -867,8 +865,8 @@ function TableViewContent() {
 
   // Mark image for deletion (no delete yet)
   const handleImageDialogDeleteImage = async (imgIdx) => {
-    if (imageDialogRowIndex === null) return;
-    const product = editedData[imageDialogRowIndex];
+    if (imageDialogProductId == null) return;
+    const product = editedData.find(p => String(p.id) === imageDialogProductId);
     const productId = product?.id;
     const imageId = product?.imageUrls?.[imgIdx];
     
@@ -887,8 +885,8 @@ function TableViewContent() {
     if (isNaN(Number(imageId))) {
       // If it's not a number, it might be a URL or empty string - just remove from local state
       const updatedImageUrls = (product.imageUrls || []).filter((id, idx) => idx !== imgIdx);
-      setEditedData(prev => prev.map((row, idx) => {
-        if (idx === imageDialogRowIndex) {
+      setEditedData(prev => prev.map((row) => {
+        if (String(row.id) === imageDialogProductId) {
           return { ...row, imageUrls: updatedImageUrls };
         }
         return row;
@@ -915,8 +913,8 @@ function TableViewContent() {
         
         // Update local state to reflect the deletion immediately
         const updatedImageUrls = (product.imageUrls || []).filter((id, idx) => idx !== imgIdx);
-        setEditedData(prev => prev.map((row, idx) => {
-          if (idx === imageDialogRowIndex) {
+        setEditedData(prev => prev.map((row) => {
+          if (String(row.id) === imageDialogProductId) {
             return { ...row, imageUrls: updatedImageUrls };
           }
           return row;
@@ -938,8 +936,8 @@ function TableViewContent() {
   };
 
   const handleSaveImages = async () => {
-    if (imageDialogRowIndex === null) return;
-    const product = editedData[imageDialogRowIndex];
+    if (imageDialogProductId == null) return;
+    const product = editedData.find(p => String(p.id) === imageDialogProductId);
     const productId = product?.id;
     if (!productId || isNaN(Number(productId))) return;
     // Start with current image IDs, remove those marked for deletion
@@ -985,8 +983,8 @@ function TableViewContent() {
   };
 
   const handleImageFileUpload = async (file, rowIndex) => {
-    if (!file || imageDialogRowIndex === null) return;
-    const productId = editMode ? editedData[rowIndex]?.id : data[rowIndex]?.id;
+    if (!file || imageDialogProductId == null) return;
+    const productId = imageDialogProductId;
     // Only allow upload if productId is a number
     if (!productId || isNaN(Number(productId))) {
       setUploadError("Cannot upload image: Product ID is not a valid number. Please use products created via backend only.");
@@ -1002,8 +1000,8 @@ function TableViewContent() {
       });
       if (response.ok) {
         const { imageId } = await response.json();
-        setEditedData(prev => prev.map((row, idx) => {
-          if (idx === rowIndex) {
+        setEditedData(prev => prev.map((row) => {
+          if (String(row.id) === imageDialogProductId) {
             const imageIds = Array.isArray(row.imageUrls) ? [...row.imageUrls] : [];
             imageIds.push(imageId);
             return { ...row, imageUrls: imageIds };
@@ -1127,8 +1125,8 @@ function TableViewContent() {
   };
 
   const handleUploadPendingImage = async () => {
-    if (imageDialogRowIndex === null || pendingImageFiles.length === 0) return;
-    const product = editedData[imageDialogRowIndex];
+    if (imageDialogProductId == null || pendingImageFiles.length === 0) return;
+    const product = editedData.find(p => String(p.id) === imageDialogProductId);
     const productId = product?.id;
     if (!productId || isNaN(Number(productId))) return;
     
@@ -1156,8 +1154,8 @@ function TableViewContent() {
     // Update local state with new image IDs immediately for better UX
     const updatedImageIds = [...(product.imageUrls || []).filter(id => !!id && !isNaN(Number(id))), ...newImageIds];
     
-    setEditedData(prev => prev.map((row, idx) => {
-      if (idx === imageDialogRowIndex) {
+    setEditedData(prev => prev.map((row) => {
+      if (String(row.id) === imageDialogProductId) {
         return { ...row, imageUrls: updatedImageIds };
       }
       return row;
@@ -1379,7 +1377,7 @@ function TableViewContent() {
             open={imageDialogOpen}
             onClose={handleCloseImageDialog}
             editMode={imageDialogEditMode}
-            imageUrls={imageDialogRowIndex !== null ? editedData[imageDialogRowIndex]?.imageUrls : []}
+            imageUrls={imageDialogProductId != null ? (editedData.find(p => String(p.id) === imageDialogProductId)?.imageUrls ?? []) : []}
             viewImageIds={viewImageIds}
             viewImagesLoading={viewImagesLoading}
             pendingImageFiles={pendingImageFiles}

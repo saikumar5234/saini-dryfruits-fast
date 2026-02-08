@@ -257,7 +257,7 @@ export const createTableColumns = ({
                 variant="outlined"
                 size="small"
                 sx={{ minWidth: 0, p: 1, borderRadius: 2, gap: 1 }}
-                onClick={() => handleOpenImageDialog(row.index, false)}
+                onClick={() => handleOpenImageDialog(row.original.id, false)}
                 startIcon={<VisibilityIcon fontSize="small" />}
               >
                 View Images
@@ -272,7 +272,7 @@ export const createTableColumns = ({
               size="small"
               color="info"
               sx={{ minWidth: 0, p: 1, borderRadius: 2, gap: 1 }}
-              onClick={() => handleOpenImageDialog(row.index, true)}
+              onClick={() => handleOpenImageDialog(row.original.id, true)}
               startIcon={<EditIcon fontSize="small" />}
             >
               Edit Images
