@@ -124,24 +124,9 @@ function TableViewContent() {
   // Price histories hook
   const priceHistories = usePriceHistories(data, editedData, editMode);
 
-  // Sort data to show active products first, disabled products at bottom
-  const sortedData = useMemo(() => {
-    const filtered = data.filter(p => isNumericId(p.id));
-    return filtered.sort((a, b) => {
-      const aDisabled = a.isDisabled ? 1 : 0;
-      const bDisabled = b.isDisabled ? 1 : 0;
-      return aDisabled - bDisabled;
-    });
-  }, [data, isNumericId]);
-
-  const sortedEditedData = useMemo(() => {
-    const filtered = editedData.filter(p => isNumericId(p.id));
-    return filtered.sort((a, b) => {
-      const aDisabled = a.isDisabled ? 1 : 0;
-      const bDisabled = b.isDisabled ? 1 : 0;
-      return aDisabled - bDisabled;
-    });
-  }, [editedData, isNumericId]);
+  // Preserve API order for display (and drag-and-drop reorder). Backend returns products ordered by sort_order.
+  const sortedData = useMemo(() => data.filter(p => isNumericId(p.id)), [data, isNumericId]);
+  const sortedEditedData = useMemo(() => editedData.filter(p => isNumericId(p.id)), [editedData, isNumericId]);
   
   // Memoize the table data to prevent unnecessary re-renders
   const tableData = useMemo(() => {
@@ -430,6 +415,29 @@ function TableViewContent() {
     }
     setSaving(false);
   }, [rowSelection]);
+
+  const handleRowOrderChange = useCallback((dragIndex, hoverIndex) => {
+    if (dragIndex === hoverIndex) return;
+    const newData = [...tableData];
+    const [removed] = newData.splice(dragIndex, 1);
+    newData.splice(hoverIndex, 0, removed);
+    setData(newData);
+    setEditedData(newData);
+    const productIds = newData.map(p => String(p.id));
+    fetch(API_ENDPOINTS.PRODUCTS_REORDER, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ productIds }),
+    })
+      .then((r) => {
+        if (!r.ok) console.error('Reorder failed:', r.status);
+        fetchProducts();
+      })
+      .catch((err) => {
+        console.error('Reorder error:', err);
+        fetchProducts();
+      });
+  }, [tableData, setData, setEditedData, fetchProducts]);
 
   const handleAddProductFieldChange = useCallback((field, value, imgIdx = null, lang = null) => {
     // If category is being changed, save it to localStorage
@@ -1340,6 +1348,7 @@ function TableViewContent() {
         setGlobalFilter={setGlobalFilter}
         onSave={() => setConfirmSaveOpen(true)}
         onCancelEdit={handleCancelEdit}
+        onRowOrderChange={handleRowOrderChange}
       />
       
       {/* Product Dialog Manager - Separate component for instant opening (like GreetingManager) */}

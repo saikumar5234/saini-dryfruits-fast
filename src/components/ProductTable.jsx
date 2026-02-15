@@ -11,7 +11,8 @@ const ProductTable = memo(({
   globalFilter,
   setGlobalFilter,
   onSave,
-  onCancelEdit
+  onCancelEdit,
+  onRowOrderChange,
 }) => {
   const { editMode, rowSelection, setRowSelection } = useEditContext();
 
@@ -29,6 +30,16 @@ const ProductTable = memo(({
       enableColumnVirtualization={false}
       getRowId={(row) => row.id.toString()}
       onRowSelectionChange={setRowSelection}
+      enableRowOrdering={!!onRowOrderChange}
+      enableSorting={false}
+      muiRowDragHandleProps={onRowOrderChange ? ({ table }) => ({
+        onDragEnd: () => {
+          const { draggingRow, hoveredRow } = table.getState();
+          if (hoveredRow != null && draggingRow != null) {
+            onRowOrderChange(draggingRow.index, hoveredRow.index);
+          }
+        },
+      }) : undefined}
       filterFns={{
         customGlobalFilter: customGlobalFilterFn,
       }}
@@ -100,7 +111,8 @@ const ProductTable = memo(({
     prevProps.tableData === nextProps.tableData &&
     prevProps.columns === nextProps.columns &&
     prevProps.i18nLanguage === nextProps.i18nLanguage &&
-    prevProps.globalFilter === nextProps.globalFilter
+    prevProps.globalFilter === nextProps.globalFilter &&
+    prevProps.onRowOrderChange === nextProps.onRowOrderChange
   );
 });
 

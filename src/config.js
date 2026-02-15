@@ -2,7 +2,7 @@
 // Use environment variable if available, otherwise use production URL
 export const BACKEND_BASE_URL = import.meta.env.VITE_BACKEND_URL ||'https://api.sainidryfruits.com';
 // export const BACKEND_BASE_URL = import.meta.env.VITE_BACKEND_URL || (import.meta.env.PROD ? '/api' : 'https://api.sainidryfruits.com');
-// export const BACKEND_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://10.224.104.124:8080';
+// export const BACKEND_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://10.58.20.124:8080';
 // Translation API configuration
 export const TRANSLATION_CONFIG = {
   // Google Translate API (requires API key)
@@ -26,6 +26,7 @@ export const API_ENDPOINTS = {
   PRODUCT_IMAGE: (imageId) => `${BACKEND_BASE_URL}/api/products/image/${imageId}`,
   PRODUCT_IMAGE_DELETE: (imageId) => `${BACKEND_BASE_URL}/api/products/image/${imageId}`,
   PRODUCT_UPDATE: (productId) => `${BACKEND_BASE_URL}/api/products/${productId}`,
+  PRODUCTS_REORDER: `${BACKEND_BASE_URL}/api/products/reorder`,
   DELETE_ALL_PRODUCTS: `${BACKEND_BASE_URL}/delete/all/products`,
   
   // Greeting endpoints
