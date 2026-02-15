@@ -125,8 +125,15 @@ function TableViewContent() {
   const priceHistories = usePriceHistories(data, editedData, editMode);
 
   // Preserve API order for display (and drag-and-drop reorder). Backend returns products ordered by sort_order.
-  const sortedData = useMemo(() => data.filter(p => isNumericId(p.id)), [data, isNumericId]);
-  const sortedEditedData = useMemo(() => editedData.filter(p => isNumericId(p.id)), [editedData, isNumericId]);
+  // Move disabled products to the bottom of the list (active first, disabled last).
+  const sortedData = useMemo(() => {
+    const filtered = data.filter(p => isNumericId(p.id));
+    return [...filtered].sort((a, b) => (a.isDisabled ? 1 : 0) - (b.isDisabled ? 1 : 0));
+  }, [data, isNumericId]);
+  const sortedEditedData = useMemo(() => {
+    const filtered = editedData.filter(p => isNumericId(p.id));
+    return [...filtered].sort((a, b) => (a.isDisabled ? 1 : 0) - (b.isDisabled ? 1 : 0));
+  }, [editedData, isNumericId]);
   
   // Memoize the table data to prevent unnecessary re-renders
   const tableData = useMemo(() => {
