@@ -36,8 +36,10 @@ const UpdateProductPrice = ({ open, onClose }) => {
       try {
         const response = await fetch(API_ENDPOINTS.PRODUCTS);
         if (!response.ok) throw new Error('Failed to fetch products');
-        const productsData = await response.json();
-        setProducts(productsData);
+        const raw = await response.json();
+        // Support both raw array and paged response { content: [...] }
+        const list = Array.isArray(raw) ? raw : (raw?.content ?? []);
+        setProducts(list);
       } catch (error) {
         setProducts([]);
       }
@@ -55,14 +57,25 @@ const UpdateProductPrice = ({ open, onClose }) => {
         setLoading(false);
         return;
       }
-      // Update product price using backend API
+      // Update product price using backend API (productId in URL must be string for correct path)
+      const productId = selectedProduct != null ? String(selectedProduct) : '';
+      if (!productId) {
+        setError('Invalid product.');
+        setLoading(false);
+        return;
+      }
       const dateString = date instanceof Date ? format(date, 'yyyy-MM-dd') : date;
-      const response = await fetch(API_ENDPOINTS.PRODUCT_PRICE(selectedProduct), {
+      const response = await fetch(API_ENDPOINTS.PRODUCT_PRICE(productId), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ price: parseFloat(price), date: dateString }),
       });
-      if (!response.ok) throw new Error('Failed to update price');
+      if (!response.ok) {
+        const msg = response.status === 404
+          ? 'Price update endpoint not found (404). Check backend has PUT /api/products/{id}/price.'
+          : 'Failed to update price.';
+        throw new Error(msg);
+      }
       const updatedProduct = products.find(p => p.id === selectedProduct);
       if (updatedProduct) {
         setSuccessProductName(getLocalized(updatedProduct.name));
@@ -75,7 +88,7 @@ const UpdateProductPrice = ({ open, onClose }) => {
       }
       return;
     } catch (err) {
-      setError('Failed to update price.');
+      setError(err?.message || 'Failed to update price.');
     } finally {
       setLoading(false);
     }

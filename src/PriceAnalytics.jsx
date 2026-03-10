@@ -133,12 +133,6 @@ const PriceAnalytics = () => {
         date: h.changedAt ? h.changedAt.split('T')[0] : '',
         price: h.price
       }));
-      if (timeRange !== 'all') {
-        const days = parseInt(timeRange);
-        const cutoff = new Date();
-        cutoff.setDate(cutoff.getDate() - days);
-        history = history.filter(h => new Date(h.date) >= cutoff);
-      }
       setPriceHistory(history);
     } catch (error) {
       setPriceHistory([]);
@@ -207,11 +201,12 @@ const PriceAnalytics = () => {
   };
 
   const rangeOptions = [
+    { label: '1D', value: 1 },
     { label: '1W', value: 7 },
     { label: '1M', value: 30 },
-    { label: '3M', value: 90 },
+    { label: '6M', value: 180 },
     { label: '1Y', value: 365 },
-    { label: 'All', value: 'all' }
+    { label: '2Y', value: 730 },
   ];
 
   // Export chart as image or PDF
@@ -270,12 +265,15 @@ const PriceAnalytics = () => {
     return dates;
   };
 
-  // Build chart data with filled missing days
+  // Build chart data respecting selected time range.
+  // - Shows a continuous line from the first known price up to today.
+  // - Fills days with no changes using the last known price.
+  // - Still shows multiple price changes within the same day as steps.
   const buildContinuousChartData = () => {
     if (!priceHistory.length) {
       // If no price history, show a straight line for the selected time range at the current price
       if (selectedProduct) {
-        const days = timeRange === 'all' ? 30 : parseInt(timeRange);
+        const days = parseInt(timeRange) || 30;
         const dateRange = getDateRange(days);
         return dateRange.map(date => ({
           date: formatChartDate(date),
@@ -284,20 +282,70 @@ const PriceAnalytics = () => {
       }
       return [];
     }
-    const days = timeRange === 'all' ? priceHistory.length : parseInt(timeRange);
-    const dateRange = getDateRange(days);
-    const priceMap = {};
-    priceHistory.forEach(entry => { priceMap[entry.date] = entry.price; });
-    let lastPrice = priceHistory[0].price;
-    return dateRange.map(date => {
-      if (priceMap[date] !== undefined) {
-        lastPrice = priceMap[date];
-      }
-      return {
-        date: formatChartDate(date),
-        price: lastPrice
-      };
+    // Ensure history is sorted by date ascending
+    const sorted = [...priceHistory].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    const days = parseInt(timeRange);
+    const today = new Date();
+
+    // Start date is today - (days - 1), so 1W shows 7 days back,
+    // even if the product / price history started later.
+    let startDate = new Date(today);
+    if (!Number.isNaN(days) && days > 0) {
+      startDate.setDate(today.getDate() - (days - 1));
+    }
+
+    // Build list of dates from startDate to today
+    const dateStrings = [];
+    const cursor = new Date(startDate);
+    while (cursor <= today) {
+      dateStrings.push(cursor.toISOString().split('T')[0]);
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    // Group history entries by date string
+    const byDate = {};
+    sorted.forEach(entry => {
+      if (!entry.date) return;
+      if (!byDate[entry.date]) byDate[entry.date] = [];
+      byDate[entry.date].push(entry);
     });
+
+    // Determine last price before or at startDate.
+    // If there is no history before startDate, we use the first known price
+    // as the baseline for earlier days.
+    let lastPrice = sorted[0].price;
+    for (let i = 0; i < sorted.length; i++) {
+      const d = new Date(sorted[i].date);
+      if (d <= startDate) {
+        lastPrice = sorted[i].price;
+      } else {
+        break;
+      }
+    }
+
+    const points = [];
+
+    dateStrings.forEach(dateStr => {
+      const dayEntries = byDate[dateStr] || [];
+
+      // Baseline point for the day (even if there is no change)
+      points.push({
+        date: formatChartDate(dateStr),
+        price: lastPrice,
+      });
+
+      // Additional points for each change within the day to show steps
+      dayEntries.forEach(entry => {
+        lastPrice = entry.price;
+        points.push({
+          date: formatChartDate(dateStr),
+          price: lastPrice,
+        });
+      });
+    });
+
+    return points;
   };
 
   return (
