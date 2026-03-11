@@ -232,8 +232,10 @@ const PriceAnalytics = () => {
   };
 
   // Modern, glassy tooltip
-  const CustomTooltip = ({ active, payload, label }) => {
+  const CustomTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
+      const point = payload[0]?.payload;
+      const tooltipLabel = point?.label ?? '';
       return (
         <Box sx={{
           background: 'rgba(255,255,255,0.85)',
@@ -245,7 +247,7 @@ const PriceAnalytics = () => {
           border: '1px solid #e0e0e0',
           backdropFilter: 'blur(4px)',
         }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#2E7D32', mb: 0.5 }}>{label}</Typography>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#2E7D32', mb: 0.5 }}>{tooltipLabel}</Typography>
           <Typography variant="h6" sx={{ fontWeight: 700, color: '#222' }}>₹{payload[0].value}</Typography>
         </Box>
       );
@@ -275,8 +277,9 @@ const PriceAnalytics = () => {
       if (selectedProduct) {
         const days = parseInt(timeRange) || 30;
         const dateRange = getDateRange(days);
-        return dateRange.map(date => ({
-          date: formatChartDate(date),
+        return dateRange.map((date, idx) => ({
+          x: `${date}-${idx}`,
+          label: formatChartDate(date),
           price: selectedProduct.price
         }));
       }
@@ -328,18 +331,21 @@ const PriceAnalytics = () => {
 
     dateStrings.forEach(dateStr => {
       const dayEntries = byDate[dateStr] || [];
+      const label = formatChartDate(dateStr);
 
       // Baseline point for the day (even if there is no change)
       points.push({
-        date: formatChartDate(dateStr),
+        x: `${dateStr}-base`,
+        label,
         price: lastPrice,
       });
 
       // Additional points for each change within the day to show steps
-      dayEntries.forEach(entry => {
+      dayEntries.forEach((entry, idx) => {
         lastPrice = entry.price;
         points.push({
-          date: formatChartDate(dateStr),
+          x: `${dateStr}-chg-${idx}`,
+          label,
           price: lastPrice,
         });
       });
@@ -625,7 +631,8 @@ const PriceAnalytics = () => {
                                     </defs>
                                     <CartesianGrid strokeDasharray="2 6" vertical={false} stroke="#f0f0f0" />
                                     <XAxis
-                                      dataKey="date"
+                                      dataKey="x"
+                                      tickFormatter={(_, idx) => chartData[idx]?.label || ''}
                                       tick={{ fontSize: 14, fill: '#888' }}
                                       axisLine={false}
                                       tickLine={false}
@@ -651,7 +658,14 @@ const PriceAnalytics = () => {
                                       animationDuration={1200}
                                       filter="url(#shadow)"
                                     />
-                                    <Brush dataKey="date" height={24} stroke={color} travellerWidth={12} fill="#e8f5e9" />
+                                    <Brush
+                                      dataKey="x"
+                                      height={24}
+                                      stroke={color}
+                                      travellerWidth={12}
+                                      fill="#e8f5e9"
+                                      tickFormatter={(_, idx) => chartData[idx]?.label || ''}
+                                    />
                                   </AreaChart>
                                 );
                               })()}
