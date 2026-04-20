@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { API_ENDPOINTS } from './config.js';
-import { formatDisplayDate, formatChartDate } from './utils/dateFormat';
+import { formatDisplayDate, formatDisplayDateTime, formatChartDate } from './utils/dateFormat';
 import {
   Box,
   Card,
@@ -354,6 +354,85 @@ const PriceAnalytics = () => {
     return points;
   };
 
+  // Build history rows from the earliest recorded change (e.g. creation) through today,
+  // still respecting the chart range by not starting later than needed. In-between days
+  // carry the last price; same-day updates are separate rows (step deltas, not one jump).
+  const buildDailyHistoryData = () => {
+    if (!selectedProduct) return [];
+
+    const days = parseInt(timeRange) || 30;
+    const today = new Date();
+    const rangeStart = new Date(today);
+    rangeStart.setDate(today.getDate() - (days - 1));
+
+    if (!priceHistory.length) {
+      const dateStrings = [];
+      const cursor = new Date(rangeStart);
+      while (cursor <= today) {
+        dateStrings.push(cursor.toISOString().split('T')[0]);
+        cursor.setDate(cursor.getDate() + 1);
+      }
+      return dateStrings.map(date => ({ date, price: selectedProduct.price }));
+    }
+
+    const sorted = [...priceHistory]
+      .filter(entry => entry.date)
+      .sort((a, b) => new Date(a.changedAt || a.date) - new Date(b.changedAt || b.date));
+
+    const firstHistoryDate = new Date(sorted[0].changedAt || sorted[0].date);
+    const startDate = firstHistoryDate < rangeStart ? firstHistoryDate : rangeStart;
+
+    const dateStrings = [];
+    const cursor = new Date(startDate);
+    while (cursor <= today) {
+      dateStrings.push(cursor.toISOString().split('T')[0]);
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    const byDate = {};
+    sorted.forEach(entry => {
+      if (!byDate[entry.date]) byDate[entry.date] = [];
+      byDate[entry.date].push(entry);
+    });
+
+    let lastPrice = sorted[0]?.price ?? selectedProduct.price;
+    for (let i = 0; i < sorted.length; i++) {
+      const entryDate = new Date(sorted[i].date);
+      if (entryDate <= startDate) {
+        lastPrice = sorted[i].price;
+      } else {
+        break;
+      }
+    }
+
+    const rows = [];
+    dateStrings.forEach(date => {
+      const dayEntries = (byDate[date] || []).sort(
+        (a, b) => new Date(a.changedAt || a.date) - new Date(b.changedAt || b.date)
+      );
+
+      if (dayEntries.length === 0) {
+        rows.push({ date, price: lastPrice });
+        return;
+      }
+
+      // No same-day baseline row: each update compares to the previous row (true step change).
+      dayEntries.forEach(entry => {
+        lastPrice = entry.price;
+        rows.push({
+          date,
+          price: lastPrice,
+          changedAt: entry.changedAt,
+          id: entry.id
+        });
+      });
+    });
+
+    return rows;
+  };
+
+  const historyRows = buildDailyHistoryData();
+
   return (
     <Fade in timeout={600}>
       <Box sx={{ minHeight: '100vh', backgroundColor: 'background.default', pt: { xs: '0px', md: '40px' } }}>
@@ -676,8 +755,8 @@ const PriceAnalytics = () => {
                     </Box>
                   )}
                   {tabValue === 1 && (
-                    <TableContainer>
-                      <Table>
+                    <TableContainer sx={{ maxHeight: 480, overflow: 'auto' }}>
+                      <Table stickyHeader>
                         <TableHead>
                           <TableRow>
                             <TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell>
@@ -687,13 +766,15 @@ const PriceAnalytics = () => {
                           </TableRow>
                         </TableHead>
                         <TableBody>
-                          {priceHistory.slice(-10).reverse().map((record, index, reversedArray) => {
+                          {[...historyRows].reverse().map((record, index, reversedArray) => {
                             const prevRecord = reversedArray[index + 1];
                             const change = prevRecord ? record.price - prevRecord.price : 0;
                             const trend = change > 0 ? 'up' : change < 0 ? 'down' : 'neutral';
                             return (
-                              <TableRow key={record.date} hover>
-                                <TableCell>{formatDisplayDate(record.date)}</TableCell>
+                              <TableRow key={record.id != null ? String(record.id) : `${record.date}-${record.changedAt ?? index}`} hover>
+                                <TableCell>
+                                  {record.changedAt ? formatDisplayDateTime(record.changedAt) : formatDisplayDate(record.date)}
+                                </TableCell>
                                 <TableCell sx={{ fontWeight: 'bold' }}>₹{record.price}</TableCell>
                                 <TableCell sx={{
                                   color: getTrendColor(trend),
